@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+
+# Node / React Native / Expo
+PararRobos/node_modules/
+PararRobos/.expo/
+PararRobos/dist/
+PararRobos/web-build/
+PararRobos/expo-env.d.ts
+PararRobos/.metro-health-check*
+
+# Native wrappers
+PararRobos/.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# OS files
+.DS_Store
+Thumbs.db

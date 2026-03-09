@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warden Edge OS</title>
+    <!-- Incluir CSS Moderno (Glassmorphism & Dark Mode base) -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Iconos Phosphor (Ligeros y estéticos) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- SIDEBAR: ESTADO DEL EDGE -->
+        <aside class="sidebar glass-panel-heavy">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <i class="ph-fill ph-shield-check icon-main"></i>
+                </div>
+                <h2>Warden OS</h2>
+                <span class="badge offline" id="network-badge"><i class="ph-fill ph-plugs"></i> EDGE MODE</span>
+            </div>
+
+            <div class="telemetry-section">
+                <h3>Telemetry</h3>
+
+                <div class="metric-card">
+                    <div class="metric-top">
+                        <i class="ph ph-door"></i>
+                        <span>Main Gate</span>
+                    </div>
+                    <div class="metric-value status-safe">Secured</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-top">
+                        <i class="ph ph-webcam"></i>
+                        <span>Vision Pipeline</span>
+                    </div>
+                    <div class="metric-value status-online">Running - 32 FPS</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-top">
+                        <i class="ph ph-cpu"></i>
+                        <span>LLM Backend</span>
+                    </div>
+                    <div class="metric-value status-standby">Standby (Ollama)</div>
+                </div>
+            </div>
+
+            <div class="logs-section">
+                <h3>Live Event Bus (MQTT)</h3>
+                <div class="terminal-logs" id="mqtt-terminal">
+                    <p><span class="time">[22:05]</span> [system] Mosquitto broker online</p>
+                    <p><span class="time">[22:06]</span> [warden] Loading LangChain tools...</p>
+                    <p><span class="time">[22:07]</span> [vision] <i>Waiting for camera stream...</i></p>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <span>El Banco <i class="ph-fill ph-map-pin"></i></span>
+            </div>
+        </aside>
+
+        <!-- MAIN WINDOW: CHAT / CONSOLA -->
+        <main class="chat-container">
+            <header class="chat-header glass-panel">
+                <div class="header-info">
+                    <h2>Command Center</h2>
+                    <p><i class="ph-fill ph-lock-key"></i> Secured local connection with The Warden</p>
+                </div>
+                <div class="header-actions">
+                    <button id="btn-sentinel" class="action-btn" title="Activar Visión">
+                        <i class="ph ph-webcam"></i> Activar Sentinel
+                    </button>
+                    <button id="btn-lock" class="action-btn" title="Lockdown">
+                        <i class="ph ph-lock-key"></i> Protocolo Cero
+                    </button>
+                    <button class="action-btn icon-only" title="Settings">
+                        <i class="ph ph-gear"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="messages-area" id="chat-messages">
+                <!-- Mensaje de Bienvenida -->
+                <div class="message assistant">
+                    <div class="avatar"><i class="ph-fill ph-robot"></i></div>
+                    <div class="bubble">Saludos, Comandante. Soy The Warden. Todos los perímetros se encuentran
+                        asegurados por el momento. ¿En qué te asisto?</div>
+                </div>
+            </div>
+
+            <div class="input-area glass-panel-input">
+                <form id="chat-form">
+                    <button type="button" class="tool-btn" title="Adjuntar (Deshabilitado)"><i
+                            class="ph ph-paperclip"></i></button>
+                    <input type="text" id="chat-input" placeholder="Comando para The Warden..." autocomplete="off"
+                        required>
+                    <button type="submit" id="send-btn" class="send-btn">
+                        <i class="ph-bold ph-paper-plane-right"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

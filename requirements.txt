@@ -1,0 +1,13 @@
+# Orquestación y Core A.I.
+langchain>=0.1.0
+crewai>=0.20.0
+pydantic>=2.0.0
+langchain-community>=0.0.10
+
+# Nota: Modelos de visión pesados, voz y LLM local (llama-cpp-python) se omiten en este dummy 
+# para acelerar la creación del entorno virtual. Los instalaremos cuando integremos el hardware.
+
+# Comunicaciones y Entorno
+paho-mqtt>=1.6.1
+fastapi>=0.100.0
+uvicorn>=0.23.0

@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warden Edge OS</title>
+    <title>Yarvis AI</title>
     <!-- Incluir CSS Moderno (Glassmorphism & Dark Mode base) -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=9">
     <!-- Iconos Phosphor (Ligeros y estéticos) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -21,9 +21,10 @@
                 <div class="logo-container">
                     <i class="ph-fill ph-shield-check icon-main"></i>
                 </div>
-                <h2>Warden OS</h2>
+                <h2>Yarvis AI</h2>
                 <span class="badge offline" id="network-badge"><i class="ph-fill ph-plugs"></i> EDGE MODE</span>
             </div>
+
 
             <div class="telemetry-section">
                 <h3>Telemetry</h3>
@@ -57,8 +58,19 @@
                 <h3>Live Event Bus (MQTT)</h3>
                 <div class="terminal-logs" id="mqtt-terminal">
                     <p><span class="time">[22:05]</span> [system] Mosquitto broker online</p>
-                    <p><span class="time">[22:06]</span> [warden] Loading LangChain tools...</p>
+                    <p><span class="time">[22:06]</span> [yarvis] Loading LangChain tools...</p>
                     <p><span class="time">[22:07]</span> [vision] <i>Waiting for camera stream...</i></p>
+                </div>
+            </div>
+
+            <div class="sidebar-thumbnail" id="hologram-trigger" title="Ver 360°">
+                <h3>Camera Feed (Thumbnail)</h3>
+                <div class="thumbnail-wrapper">
+                    <img src="assets/fotocasa/1.jpg" alt="House Thumbnail">
+                    <div class="thumbnail-overlay">
+                        <i class="ph-bold ph-arrows-out"></i>
+                        <span>Abrir 360°</span>
+                    </div>
                 </div>
             </div>
 
@@ -72,26 +84,52 @@
             <header class="chat-header glass-panel">
                 <div class="header-info">
                     <h2>Command Center</h2>
-                    <p><i class="ph-fill ph-lock-key"></i> Secured local connection with The Warden</p>
+                    <p><i class="ph-fill ph-lock-key"></i> Secured local connection with Yarvis</p>
                 </div>
                 <div class="header-actions">
+                    <div class="mode-selector-container">
+                        <select id="select-mode" class="mode-select" title="Seleccionar Modo de Operación">
+                            <option value="Ninguno">🌑 Modo: Ninguno</option>
+                            <option value="Manana">🌅 Mañana</option>
+                            <option value="Tarde">☀️ Tarde</option>
+                            <option value="Noche">🌙 Noche</option>
+                            <option value="Dormir">🛌 Dormir</option>
+                            <option value="Tarde Alegre">🍹 Tarde Alegre</option>
+                            <option value="Noche Romantica">🕯️ Noche Romántica</option>
+                            <option value="Fiesta">🎸 Fiesta</option>
+                            <option value="Seguridad Maxima">🛡️ Seguridad Máxima</option>
+                            <option value="Mantenimiento">🔧 Mantenimiento</option>
+                            <option value="Yoga">🧘 Yoga</option>
+                            <option value="Estudio">📖 Estudio</option>
+                        </select>
+                    </div>
+                    <button id="btn-voice" class="action-btn" title="Activar Interfaz de Voz">
+                        <i class="ph ph-microphone"></i> Activar Voz
+                    </button>
                     <button id="btn-sentinel" class="action-btn" title="Activar Visión">
                         <i class="ph ph-webcam"></i> Activar Sentinel
                     </button>
                     <button id="btn-lock" class="action-btn" title="Lockdown">
                         <i class="ph ph-lock-key"></i> Protocolo Cero
                     </button>
-                    <button class="action-btn icon-only" title="Settings">
+                    <button id="btn-settings" class="action-btn icon-only" title="Configurar ESP32">
                         <i class="ph ph-gear"></i>
                     </button>
                 </div>
             </header>
 
+            <div id="voice-loading-bar" class="voice-loading-bar hidden">
+                <i class="ph-bold ph-spinner-gap spin"></i> <span>Arrancando Motor STT offline en Edge Server...</span>
+                <div class="progress-bar">
+                    <div class="progress"></div>
+                </div>
+            </div>
+
             <div class="messages-area" id="chat-messages">
                 <!-- Mensaje de Bienvenida -->
                 <div class="message assistant">
                     <div class="avatar"><i class="ph-fill ph-robot"></i></div>
-                    <div class="bubble">Saludos, Comandante. Soy The Warden. Todos los perímetros se encuentran
+                    <div class="bubble">Saludos, Comandante. Soy Yarvis. Todos los perímetros se encuentran
                         asegurados por el momento. ¿En qué te asisto?</div>
                 </div>
             </div>
@@ -100,8 +138,7 @@
                 <form id="chat-form">
                     <button type="button" class="tool-btn" title="Adjuntar (Deshabilitado)"><i
                             class="ph ph-paperclip"></i></button>
-                    <input type="text" id="chat-input" placeholder="Comando para The Warden..." autocomplete="off"
-                        required>
+                    <input type="text" id="chat-input" placeholder="Comando para Yarvis..." autocomplete="off" required>
                     <button type="submit" id="send-btn" class="send-btn">
                         <i class="ph-bold ph-paper-plane-right"></i>
                     </button>
@@ -110,7 +147,171 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <!-- PANEL DE SEGURIDAD PATIO -->
+    <div id="patio-security-panel" class="modal-overlay hidden">
+        <div class="modal-content security-modal glass-panel-heavy">
+            <header class="modal-header">
+                <h3><i class="ph-fill ph-shield-check"></i> Estado Seguridad Patio</h3>
+                <button id="close-security" class="action-btn icon-only"><i class="ph-bold ph-x"></i></button>
+            </header>
+            <div class="security-dashboard">
+                <div class="sensor-grid">
+                    <div class="sensor-card" id="sensor-motion_front">
+                        <i class="ph-fill ph-person-simple-walk"></i>
+                        <p>Mov. Frontal</p>
+                        <span class="status-indicator">Inactivo</span>
+                    </div>
+                    <div class="sensor-card" id="sensor-motion_back">
+                        <i class="ph-fill ph-person-simple-walk"></i>
+                        <p>Mov. Trasero</p>
+                        <span class="status-indicator">Inactivo</span>
+                    </div>
+                    <div class="sensor-card" id="sensor-laser_perim_1">
+                        <i class="ph-fill ph-align-justify"></i>
+                        <p>Laser 1</p>
+                        <span class="status-indicator">Inactivo</span>
+                    </div>
+                    <div class="sensor-card" id="sensor-laser_perim_2">
+                        <i class="ph-fill ph-align-justify"></i>
+                        <p>Laser 2</p>
+                        <span class="status-indicator">Inactivo</span>
+                    </div>
+                    <div class="sensor-card" id="sensor-rf_access">
+                        <i class="ph-fill ph-key"></i>
+                        <p>Acceso RF</p>
+                        <span class="status-indicator">Inactivo</span>
+                    </div>
+                    <div class="sensor-card siren-card" id="sensor-siren">
+                        <i class="ph-fill ph-megaphone"></i>
+                        <p>Sirena</p>
+                        <button id="btn-toggle-siren-ui" class="btn-siren">Activar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 360 HOLOGRAM MODAL -->
+    <div id="hologram-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel-heavy">
+            <header class="modal-header">
+                <h3><i class="ph-fill ph-bounding-box"></i> Yarvis 360° Projection</h3>
+                <button id="close-hologram" class="action-btn icon-only"><i class="ph-bold ph-x"></i></button>
+            </header>
+            <div class="hologram-container" id="hologram-container">
+                <img src="assets/fotocasa/1.jpg" id="hologram-image" alt="House 360" draggable="false">
+                <div class="hologram-overlay"></div>
+                <div class="drag-hint"><i class="ph-fill ph-hand-swipe-left"></i> Desliza para rotar</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIGURACIÓN & DISPOSITIVOS (Tabbed) -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-content settings-modal-content glass-panel-heavy">
+            <header class="modal-header">
+                <h3><i class="ph-fill ph-gear"></i> Configuración Yarvis</h3>
+                <button id="close-settings" class="action-btn icon-only"><i class="ph-bold ph-x"></i></button>
+            </header>
+
+            <!-- Tabs nav -->
+            <div class="settings-tabs">
+                <button class="stab active" data-tab="tab-config"><i class="ph ph-sliders"></i> General</button>
+                <button class="stab" data-tab="tab-add"><i class="ph ph-plus-circle"></i> Agregar ESP</button>
+                <button class="stab" data-tab="tab-devices"><i class="ph ph-devices"></i> Dispositivos</button>
+            </div>
+
+            <!-- TAB 1: Configuración general -->
+            <div id="tab-config" class="settings-tab-content active settings-body">
+                <div class="settings-section">
+                    <h4><i class="ph ph-wifi-high"></i> Red WiFi del ESP32</h4>
+                    <div class="settings-row">
+                        <label>SSID</label>
+                        <input type="text" id="cfg-wifi-ssid" placeholder="Mi_Red_WiFi" />
+                    </div>
+                    <div class="settings-row">
+                        <label>Contraseña</label>
+                        <input type="password" id="cfg-wifi-pass" placeholder="••••••••" />
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4><i class="ph ph-broadcast"></i> Broker MQTT</h4>
+                    <div class="settings-row">
+                        <label>IP del Servidor</label>
+                        <input type="text" id="cfg-broker-ip" placeholder="192.168.1.138" />
+                    </div>
+                    <div class="settings-row">
+                        <label>Puerto</label>
+                        <input type="number" id="cfg-broker-port" placeholder="1883" value="1883" />
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4><i class="ph ph-cpu"></i> Hardware por defecto</h4>
+                    <div class="settings-row">
+                        <label>Pin LED Sirena</label>
+                        <select id="cfg-siren-pin">
+                            <option value="2" selected>Pin 2 (LED integrado)</option>
+                            <option value="4">Pin 4</option>
+                            <option value="5">Pin 5</option>
+                            <option value="14">Pin 14</option>
+                            <option value="16">Pin 16</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button id="btn-download-code" class="btn-primary-full">
+                        <i class="ph-bold ph-download-simple"></i> Descargar Código Arduino (.ino)
+                    </button>
+                    <button id="btn-apply-settings" class="btn-secondary-full">
+                        <i class="ph-bold ph-check"></i> Guardar Configuración
+                    </button>
+                </div>
+                <div id="settings-status" class="settings-status-msg hidden"></div>
+            </div>
+
+            <!-- TAB 2: Agregar nuevo ESP -->
+            <div id="tab-add" class="settings-tab-content settings-body">
+                <div class="settings-section">
+                    <h4><i class="ph ph-plugs-connected"></i> Conectar nuevo dispositivo</h4>
+                    <div class="settings-row">
+                        <label>Tipo de dispositivo</label>
+                        <select id="esp-type-select">
+                            <option value="esp32_security">🔒 Seguridad (Patio)</option>
+                            <option value="esp32_pool">🏊 Control Piscina</option>
+                            <option value="esp32_kitchen">🍳 Control Cocina</option>
+                            <option value="esp32_garden">🌿 Luces Jardín</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>IP del ESP32</label>
+                        <input type="text" id="esp-ip-input" placeholder="192.168.1.131" />
+                    </div>
+                    <div class="settings-row">
+                        <label>Nombre</label>
+                        <input type="text" id="esp-name-input" placeholder="ESP32 Patio" />
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button id="btn-add-esp" class="btn-primary-full">
+                        <i class="ph-bold ph-plus"></i> Vincular Dispositivo
+                    </button>
+                    <button id="btn-download-device-code" class="btn-secondary-full">
+                        <i class="ph-bold ph-download-simple"></i> Descargar Código para este Tipo
+                    </button>
+                </div>
+                <div id="add-esp-status" class="settings-status-msg hidden"></div>
+            </div>
+
+            <!-- TAB 3: Dispositivos guardados en DB -->
+            <div id="tab-devices" class="settings-tab-content settings-body">
+                <div id="devices-db-list">
+                    <p class="empty-devices-msg">Cargando dispositivos...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

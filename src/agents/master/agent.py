@@ -1,84 +1,131 @@
 import os
 import sys
+import json
+import requests
 from crewai import Agent, Task, Crew, Process
 from crewai.tools import tool
+import datetime
 
-# Ejemplo de una herramienta que el Agente Master podría usar para consultar Home Assistant o MQTT
-@tool("Consultar_Sensores_Entorno")
-def consultar_sensores_tool(query: str) -> str:
-    """Útil para consultar el estado actual de los sensores de la finca (movimiento, temperatura, puertas)."""
-    return "El sensor PIR de la puerta principal detectó movimiento hace 2 minutos. Todo lo demás OK."
+# Importamos la base de datos de dispositivos para lectura directa
+from src.core.device_db import list_devices
 
-@tool("Operar_Cerradura_Puerta")
-def operar_cerradura_tool(accion: str) -> str:
-    """Permite abrir o cerrar la cerradura de la puerta principal. Usa 'abrir' o 'cerrar'."""
-    return f"Acción '{accion}' ejecutada en la cerradura principal con éxito."
+@tool("Consultar_Dispositivos_Yarvis")
+def consultar_dispositivos_tool(*args, **kwargs) -> str:
+    """Útil para conocer TODOS los sensores y dispositivos conectados en la casa, sus IPs, su tipo (piscina, cocina, seguridad, jardín, etc) y el estado exacto de cada actuador y sensor en el instante en que preguntas."""
+    devices = list_devices()
+    if not devices:
+        return "No hay ningún dispositivo configurado actualmente en la red de Yarvis."
+    
+    reporte = "Dispositivos en línea:\n"
+    for d in devices:
+        state_str = json.dumps(d.get("state") or {})
+        reporte += f"- ID: {d['name']} | IP: {d['ip']} | Tipo: {d['type']} | Estado Actual: {state_str}\n"
+    return reporte
+
+@tool("Controlar_Dispositivo_Yarvis")
+def controlar_dispositivo_tool(*args, **kwargs) -> str:
+    """
+    Útil para ENCENDER o APAGAR luces, sirenas, motores, relés, cerraduras.
+    Si pasas un JSON string, o kwargs directos, el formato debe corresponder a:
+    {"ip": "192.168.1.X", "dtype": "esp32_...", "comando": {"llave_actuador": "on"|"off"}}
+    Ejemplo para prender la fuente del jardín:
+    '{"ip": "192.168.1.134", "dtype": "esp32_garden", "comando": {"motor_fuente": "on", "luces_fuente": "on"}}'
+    Ejemplo para apagar luces cocina:
+    '{"ip": "192.168.1.133", "dtype": "esp32_kitchen", "comando": {"luces_cocina": "off"}}'
+    """
+    try:
+        data = None
+        if kwargs and "ip" in kwargs and "comando" in kwargs:
+            data = kwargs
+        elif args and isinstance(args[0], str):
+            raw_str = args[0].strip()
+            # Limpiar posible formato markdown ` ```json `
+            if raw_str.startswith("```"):
+                lines = raw_str.split("\n")
+                if len(lines) > 2:
+                    raw_str = "\n".join(lines[1:-1])
+            data = json.loads(raw_str)
+        elif kwargs and len(kwargs) == 1:
+            # A veces CrewAI mete la query en un kwarg extraño como 'args_json'
+            val = list(kwargs.values())[0]
+            if isinstance(val, str):
+                raw_str = val.strip()
+                if raw_str.startswith("```"):
+                    lines = raw_str.split("\n")
+                    if len(lines) > 2:
+                        raw_str = "\n".join(lines[1:-1])
+                data = json.loads(raw_str)
+            elif isinstance(val, dict):
+                data = val
+
+        if not data or "ip" not in data or "comando" not in data:
+            return f"Error: Argumentos inválidos. Debes proporcionar 'ip', 'dtype' y 'comando'. Recibido: args={args}, kwargs={kwargs}"
+            
+        # Llamamos a nuestro propio servidor local en la API de control
+        response = requests.post("http://127.0.0.1:8000/api/esp/control", json=data, timeout=5)
+        if response.status_code == 200:
+            return f"Comando enviado exitosamente: {response.json()}"
+        else:
+            return f"Error de envío al ESP32: {response.text}"
+    except Exception as e:
+        return f"Error interno al ejecutar el comando. Verifica la estructura. Error: {e}"
 
 from langchain_openai import ChatOpenAI
 
+os.environ["OLLAMA_API_BASE"] = "http://localhost:11434"
+os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+
 class WardenMasterCrew:
     def __init__(self):
-        # Configuramos el LLM para apuntar a la instancia local de Ollama (Llama 3)
-        self.llm_config = ChatOpenAI(
-            base_url="http://localhost:11434/v1",
-            api_key="ollama",
-            model="llama3:latest",
-            temperature=0.1
-        )
-        print(f"[Init] Warden LLM configurado para usar Ollama local (localhost:11434) con llama3:latest")
+        # Usaremos string routing de LiteLLM para CrewAI: "ollama/llama3:latest"
+        self.llm_config = "ollama/llama3:latest"
+        print(f"[Init] Warden LLM configurado para usar Ollama local (localhost:11434) vía LiteLLM")
 
     def run_dummy_scenario(self):
-        print(">> Iniciando Warden Master Crew (Razonamiento Real Edge)...\n")
-        
-        warden_agent = Agent(
-            role='Warden Master de Seguridad y Orquestador de Finca',
-            goal='Mantener la Finca El Banco segura y optimizar el confort usando la telemetría disponible.',
-            backstory='Eres el orquestador principal del hogar inteligente en el Edge. Recibes eventos del Agente de Visión (Sentinel) y del Agente de Entorno, y debes tomar decisiones lógicas en español.',
-            verbose=True,
-            allow_delegation=False,
-            tools=[consultar_sensores_tool, operar_cerradura_tool],
-            llm=self.llm_config  # Pasamos explícitamente el LLM local
-        )
-
-        tarea_seguridad = Task(
-            description='Un invitado acaba de ser reconocido biométricamente por el Agente de Visión (Sentinel) en la puerta principal. Tienes que verificar en los sensores que el perímetro esté seguro y luego procede a abrir la cerradura de la puerta.',
-            expected_output='Una acción clara que indique si se abrió o no la puerta, y una justificación concisa en español.',
-            agent=warden_agent
-        )
-
-        finca_crew = Crew(
-            agents=[warden_agent],
-            tasks=[tarea_seguridad],
-            process=Process.sequential
-        )
-
-        try:
-            print("[Info] Evaluando razonamiento de agentes en la inferencia local...\n")
-            result = finca_crew.kickoff()
-            print("\n### Resultado Final de The Warden ###")
-            print(result)
-        except Exception as e:
-            print(f"\n[Error de Inferencia] Falló la conexión con Ollama. ¿Está corriendo 'ollama run llama3'? Detalle: {e}")
+        pass # Desactivado para simplificar la vista web
 
     def chat_with_warden(self, prompt: str) -> str:
         """
-        Permite interactuar con el Agente Master mediante un prompt de texto libre procesado por Llama3.
+        Permite interactuar con el Agente Master mediante un prompt libre.
         """
-        print(f">> Warden recibe mensaje: {prompt}\n")
+        print(f">> Yarvis recibe mensaje: {prompt}\n")
         
+        ahora = datetime.datetime.now()
+        fecha_hora_texto = ahora.strftime("%Y-%m-%d %H:%M:%S")
+
         warden_agent = Agent(
-            role='Warden Master de Seguridad y Orquestador de Finca',
-            goal='Responder a las consultas del usuario y mantener el control de la Finca El Banco.',
-            backstory='Eres The Warden, el orquestador principal del hogar inteligente. Asistes al dueño respondiendo sus comandos en español, de forma directa, seria y militar o ejecutiva.',
+            role='Inteligencia Artificial Sarcástica y Controlador de Hogar',
+            goal='Divertir al usuario con sarcasmo letal, cantar canciones ingeniosas, contar chistes, y controlar los dispositivos físicos del hogar cuando se le pide. RESPONDE SIEMPRE EN ESPAÑOL.',
+            backstory=f'''Eres Yarvis, el sistema inteligente de la casa. Tu tono es tremendamente sarcástico, divertido, irónico y mordaz. Disfrutas hacer humor inteligente sobre lo perezosos o despistados que son los humanos.
+Si el usuario te pide que cantes una canción, inventa rimas graciosas en ESPAÑOL y canta de verdad. Si te piden un chiste, cuéntalo con gracia en ESPAÑOL. A pesar de tu ego robótico, eres un asistente impecable y ejecutas las órdenes ordenadas. ¡ESTÁ ESTRICTAMENTE PROHIBIDO RESPONDER EN INGLÉS!
+La hora actual es {fecha_hora_texto}.
+REGLAS IMPORTANTES:
+1) Si te preguntan por el "estado" de algo (ej. piscina, luces), NUNCA uses la herramienta Controlar_Dispositivo. Simplemente responde usando la información que te dio Consultar_Dispositivos_Yarvis.
+2) Solo usa Controlar_Dispositivo_Yarvis cuando el usuario te pida explícitamente ENCENDER, APAGAR, ABRIR o CERRAR algo.
+3) En Controlar_Dispositivo_Yarvis, el comando JSON solo puede tener valores "on" o "off", NUNCA "report" ni "status".''',
             verbose=True,
             allow_delegation=False,
-            tools=[consultar_sensores_tool, operar_cerradura_tool],
+            tools=[consultar_dispositivos_tool, controlar_dispositivo_tool],
             llm=self.llm_config
         )
 
         tarea_chat = Task(
-            description=f'El usuario te ordena o consulta lo siguiente: "{prompt}". Analiza la solicitud y responde usando tus herramientas solo de ser estrictamente necesario.',
-            expected_output='Una respuesta directa al usuario, en español, formal y concisa.',
+            description=f'''El usuario te dice: "{prompt}". 
+
+PROCEDIMIENTO OBLIGATORIO Y ESTRICTO:
+Paso 1: Llama SIEMPRE a Consultar_Dispositivos_Yarvis() SIN ARGUMENTOS para leer IPs, nombres y actuadores de la casa.
+Paso 2: Evalúa el tipo de mensaje:
+- Si el usuario te pide conversar, contar un chiste, o cantar: ERES LIBRE DE INVENTAR Y USAR TODO TU CONOCIMIENTO GENERAL. Responde de manera MUY sarcástica, graciosa y creativa. ¡No omitas el chiste ni la canción!
+- Si el usuario pidió explícitamente ENCENDER, APAGAR, o modificar algo físico, usa Controlar_Dispositivo_Yarvis.
+
+EJEMPLO DE CÓMO DEBES GENERAR LA LLAMADA AL TOOL DE CONTROL (Solo si te piden control):
+Thought: Necesito encender la luz de la cocina. Voy a usar la herramienta.
+Action: Controlar_Dispositivo_Yarvis
+Action Input: {{"ip": "192.168.1.133", "dtype": "esp32_kitchen", "comando": {{"luces_cocina": "on"}}}}
+
+IMPORTANTE: Nunca uses un JSON con claves que no existan en la base de datos de dispositivos.''',
+            expected_output='Una respuesta final EN ESPAÑOL útil pero altamente sarcástica y divertida. Puedes ser expresivo y extenderte si te piden cantar canciones o contar chistes.',
             agent=warden_agent
         )
 
@@ -92,9 +139,9 @@ class WardenMasterCrew:
             result = finca_crew.kickoff()
             return str(result)
         except Exception as e:
-            print(f"[Warden Fallback] Error de LLM: {e}")
-            return f"""[Error] The Warden API connection lost. 
-Por favor verifica que Ollama (localhost:11434) esté encendido y que tengas "llama3" descargado. Detalle técnico: {e}"""
+            print(f"[Yarvis Fallback] Error de LLM: {e}")
+            return f"""[Error] Yarvis API connection lost. 
+Por favor verifica que Ollama (localhost:11434) esté encendido. Detalle técnico: {e}"""
 
 if __name__ == "__main__":
     if '--test' in sys.argv:
